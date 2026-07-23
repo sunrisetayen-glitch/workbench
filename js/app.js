@@ -1,5 +1,5 @@
 // 应用入口：状态管理、事件绑定、筛选/搜索、渲染编排
-import { PLATFORMS, detectPlatform } from './platforms.js';
+import { PLATFORMS, getPlatform, detectPlatform } from './platforms.js';
 import {
   getAllBookmarks,
   putBookmark,
@@ -110,13 +110,32 @@ function openForm(initial) {
   document.body.appendChild(formModal(PLATFORMS, initial || {}));
 }
 
+// 尝试读取剪贴板链接，自动识别平台预填表单
+async function openFormWithClipboard() {
+  closeModal();
+  let prefill = {};
+  try {
+    const text = await navigator.clipboard.readText();
+    const urlMatch = text.match(/https?:\/\/[^\s]+/);
+    if (urlMatch) {
+      const url = urlMatch[0];
+      const platform = detectPlatform(url);
+      prefill = { url, platform };
+      toast(`已识别链接：${platform ? getPlatform(platform)?.name || '' : '未知平台'}`);
+    }
+  } catch (_) {
+    // 剪贴板不可读（如 http 环境），静默回退到空白表单
+  }
+  document.body.appendChild(formModal(PLATFORMS, prefill));
+}
+
 // ---- 事件绑定 ----
 function bindEvents() {
   // 打开详情
   document.addEventListener('open-bookmark', (e) => openDetail(e.detail));
 
-  // 添加按钮
-  $('#add-btn').addEventListener('click', () => openForm());
+  // 添加按钮：读取剪贴板并弹出表单
+  $('#add-btn').addEventListener('click', () => openFormWithClipboard());
 
   // 搜索框
   let qTimer = null;
