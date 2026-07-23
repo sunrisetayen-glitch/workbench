@@ -110,18 +110,88 @@ function openForm(initial) {
   document.body.appendChild(formModal(PLATFORMS, initial || {}));
 }
 
-// 尝试读取剪贴板链接，自动识别平台预填表单
+// 从文本中提取关键词作为建议标签
+function suggestTags(text) {
+  if (!text || text.length < 2) return [];
+  // 用 Intl.Segmenter 分词，取出现频率最高的有意义词
+  const seg =
+    typeof Intl !== 'undefined' &&
+    typeof Intl.Segmenter === 'function' &&
+    (() => {
+      try {
+        return new Intl.Segmenter('zh', { granularity: 'word' });
+      } catch (_) {
+        return null;
+      }
+    })();
+  const freq = new Map();
+  const t = text.toLowerCase();
+  if (seg) {
+    for (const { segment, isWordLike } of seg.segment(t)) {
+      if (isWordLike && segment.length >= 2 && segment.length <= 8) {
+        freq.set(segment, (freq.get(segment) || 0) + 1);
+      }
+    }
+  } else {
+    // 回退：英文单词 + 中文 2-3 字词组
+    const en = t.match(/[a-z]{3,}/g) || [];
+    for (const w of en) freq.set(w, (freq.get(w) || 0) + 1);
+    const cn = t.match(/[\u4e00-\u9fff]/g) || [];
+    for (let i = 0; i < cn.length - 1; i++) {
+      const bigram = cn[i] + cn[i + 1];
+      freq.set(bigram, (freq.get(bigram) || 0) + 1);
+    }
+  }
+  // 过滤常见停用词和无意义词
+  const stop = new Set([
+    '一个', '这个', '那个', '可以', '什么', '怎么', '如何', '为什么',
+    '但是', '而且', '所以', '因为', '已经', '还是', '或者', '没有',
+    '他们', '我们', '自己', '就是', '这样', '那样', '一样', '一下',
+    '真的', '太', '很', '都', '也', '不', '了', '吗', '呢', '吧',
+    '啊', '哦', '嗯', '在', '的', '是', '有', '和', '我', '你',
+    '他', '她', '它', '这', '那', '看', '说', '来', '去', '到',
+  ]);
+  const sorted = [...freq.entries()]
+    .filter(([w]) => !stop.has(w))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([w]) => w);
+  return sorted;
+}
+
+// 清理剪贴板中多余的装饰文字（平台分享前缀等）
+function cleanClipboardText(raw) {
+  return raw
+    .replace(/^(小红书|抖音|快手|微博|知乎|B站|bilibili|豆瓣|YouTube|Twitter|Instagram|TikTok)\s*[｜|\-—·:：\s]\s*/i, '')
+    .replace(/[\n\r]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+// 尝试读取剪贴板链接，自动识别平台、提取标题、建议标签
 async function openFormWithClipboard() {
   closeModal();
   let prefill = {};
   try {
-    const text = await navigator.clipboard.readText();
-    const urlMatch = text.match(/https?:\/\/[^\s]+/);
+    const raw = await navigator.clipboard.readText();
+    if (!raw) {
+      document.body.appendChild(formModal(PLATFORMS, {}));
+      return;
+    }
+    const urlMatch = raw.match(/https?:\/\/[^\s]+/);
     if (urlMatch) {
       const url = urlMatch[0];
       const platform = detectPlatform(url);
-      prefill = { url, platform };
-      toast(`已识别链接：${platform ? getPlatform(platform)?.name || '' : '未知平台'}`);
+      // 去掉 URL 后剩下的就是标题/描述文字
+      let rest = raw.replace(url, '').trim();
+      rest = cleanClipboardText(rest);
+      const tags = suggestTags(rest);
+      prefill = { url, platform, title: rest, tags };
+      const pname = platform ? getPlatform(platform)?.name : '';
+      const detail = [pname, rest ? '标题' : '', tags.length ? `${tags.length}个标签` : '']
+        .filter(Boolean)
+        .join(' + ');
+      toast(detail ? `已识别：${detail}` : `已识别链接：${pname || '未知平台'}`);
     }
   } catch (_) {
     // 剪贴板不可读（如 http 环境），静默回退到空白表单
