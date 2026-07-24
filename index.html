@@ -2,16 +2,66 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#ff5a5f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="灵感台" />
     <meta name="description" content="自媒体灵感工作台：集中管理各平台收藏，跨平台找参考" />
     <title>灵感工作台</title>
+
+    <!-- PWA manifest -->
     <link rel="manifest" href="./manifest.webmanifest" />
+
+    <!-- iOS 主屏图标 -->
     <link rel="apple-touch-icon" href="./assets/icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="./assets/icons/icon-512.png" />
     <link rel="icon" href="./assets/icons/icon-192.png" />
+
+    <!-- iOS 启动画面（splash screen）：纯色背景，点图标立刻看到品牌色，不等 JS 加载 -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- 内联关键 CSS：骨架屏 + 品牌色背景，避免 FOUC -->
+    <style>
+      :root{--accent:#ff5a5f;--bg:#f6f7fb}
+      *{box-sizing:border-box;margin:0;padding:0}
+      html,body{height:100%}
+      body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif}
+      /* 骨架屏：在 JS 加载前瞬间展示 */
+      .skeleton{display:flex;flex-direction:column;height:100%}
+      .skeleton-top{background:rgba(255,255,255,.9);backdrop-filter:saturate(180%) blur(12px);padding:calc(env(safe-area-inset-top) + 14px) 14px 12px;border-bottom:1px solid #ececf0}
+      .sk-logo{height:22px;width:120px;background:#e8e9ed;border-radius:6px}
+      .sk-search{height:42px;background:#e8e9ed;border-radius:12px;margin-top:10px}
+      .sk-chips{display:flex;gap:8px;margin-top:10px}
+      .sk-chip{height:30px;width:56px;background:#e8e9ed;border-radius:999px}
+      .sk-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px 14px;flex:1}
+      .sk-card{background:#e8e9ed;border-radius:16px;height:160px;animation:pulse 1.4s ease-in-out infinite}
+      .sk-card:nth-child(2){animation-delay:.15s}
+      .sk-card:nth-child(3){animation-delay:.3s}
+      .sk-card:nth-child(4){animation-delay:.45s}
+      @keyframes pulse{0%,100%{opacity:.4}50%{opacity:.8}}
+      /* JS 加载完成后隐藏骨架屏 */
+      .app-ready .skeleton{display:none}
+    </style>
+
     <link rel="stylesheet" href="./css/styles.css" />
   </head>
   <body>
+    <!-- 骨架屏：JS 未加载完时展示，避免白屏 -->
+    <div class="skeleton">
+      <div class="skeleton-top">
+        <div class="sk-logo"></div>
+        <div class="sk-search"></div>
+        <div class="sk-chips">
+          <div class="sk-chip"></div><div class="sk-chip"></div><div class="sk-chip"></div><div class="sk-chip"></div><div class="sk-chip"></div>
+        </div>
+      </div>
+      <div class="sk-grid">
+        <div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div>
+      </div>
+    </div>
+
+    <!-- 真实 UI（app.js 初始化后渲染） -->
     <header class="topbar">
       <div class="topbar-row">
         <h1 class="logo">✨ 灵感工作台</h1>
@@ -35,6 +85,22 @@
       <div class="grid-meta"><span id="count">0 / 0</span></div>
       <section id="grid" class="grid"></section>
     </main>
+
+    <!-- 底部导航栏 -->
+    <nav class="bottom-nav">
+      <button class="bn-item bn-item--active" data-tab="home">
+        <span class="bn-icon">🏠</span>
+        <span class="bn-label">首页</span>
+      </button>
+      <button class="bn-item" id="add-btn-nav" data-tab="add">
+        <span class="bn-icon bn-icon--add">＋</span>
+        <span class="bn-label">添加</span>
+      </button>
+      <button class="bn-item" data-tab="stats">
+        <span class="bn-icon">📊</span>
+        <span class="bn-label">统计</span>
+      </button>
+    </nav>
 
     <button id="add-btn" class="fab" aria-label="添加收藏">＋</button>
 

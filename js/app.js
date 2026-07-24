@@ -27,6 +27,19 @@ const state = {
 
 const $ = (sel) => document.querySelector(sel);
 
+// iOS 触觉反馈（轻震动）
+function haptic(style = 'light') {
+  try {
+    if (navigator.vibrate) navigator.vibrate(style === 'medium' ? 10 : 4);
+  } catch (_) { /* noop */ }
+}
+
+// 标记应用就绪：隐藏骨架屏
+function appReady() {
+  document.body.classList.add('app-ready');
+  document.body.classList.add('has-bottom-nav');
+}
+
 async function load() {
   state.all = await getAllBookmarks();
   render();
@@ -202,10 +215,13 @@ async function openFormWithClipboard() {
 // ---- 事件绑定 ----
 function bindEvents() {
   // 打开详情
-  document.addEventListener('open-bookmark', (e) => openDetail(e.detail));
+  document.addEventListener('open-bookmark', (e) => { haptic(); openDetail(e.detail); });
 
   // 添加按钮：读取剪贴板并弹出表单
-  $('#add-btn').addEventListener('click', () => openFormWithClipboard());
+  $('#add-btn').addEventListener('click', () => { haptic('medium'); openFormWithClipboard(); });
+  // 底部导航栏的添加按钮
+  const navAdd = $('#add-btn-nav');
+  if (navAdd) navAdd.addEventListener('click', () => { haptic('medium'); openFormWithClipboard(); });
 
   // 搜索框
   let qTimer = null;
@@ -222,6 +238,7 @@ function bindEvents() {
   $('#tagcloud').addEventListener('click', (e) => {
     const btn = e.target.closest('.cloud-tag');
     if (!btn) return;
+    haptic();
     const tag = btn.dataset.tag;
     $('#search').value = tag;
     state.query = tag;
@@ -314,6 +331,7 @@ function registerSW() {
 async function init() {
   bindEvents();
   await load();
+  appReady();
   registerSW();
 }
 
