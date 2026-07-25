@@ -173,22 +173,85 @@ body {
   border-radius: 10px; padding: 8px 14px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--text);
 }
 
-/* 响应式：手机端 */
+/* 响应式：手机端 —— 窄侧栏（图标条）+ 面板浮层 */
 @media (max-width: 767px) {
-  .app-layout { flex-direction: column; }
+  .app-layout { flex-direction: row; height: 100%; position: relative; overflow: hidden; }
+
+  /* 窄侧栏：只显示图标按钮 */
   .sidebar {
-    position: relative;
-    width: 100%; max-width: none; min-width: 0;
+    position: relative; z-index: 30;
+    width: 52px; min-width: 52px; max-width: 52px;
+    height: 100%;
     transform: none; transition: none;
-    box-shadow: none; border-right: none; border-bottom: 1px solid var(--line);
-    height: 50vh;
+    box-shadow: none; border-right: 1px solid var(--line);
+    flex-direction: column; overflow: visible;
+    background: #fff;
   }
-  .sidebar--open { transform: none; }
-  .sidebar--collapsed { transform: none; height: 0; overflow: hidden; }
-  .mobile-sidebar-btn { display: none; }
+
+  /* 隐藏侧栏中除 module-tabs 外的所有内容 */
+  .sidebar-header { display: none; }
+  .sidebar-stats { display: none; }
+
+  /* module-tabs 变成垂直图标条 */
+  .module-tabs {
+    flex-direction: column; border-bottom: none;
+    padding: 10px 0; gap: 4px; align-items: center;
+    flex: none;
+  }
+  .module-tab {
+    flex: none; border-bottom: none !important;
+    width: 42px; height: 42px; padding: 0;
+    font-size: 20px; text-align: center;
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); position: relative;
+    overflow: hidden;
+  }
+  .module-tab--active { color: #fff; background: var(--accent); }
+
+  /* 移动端只显示 emoji，隐藏文字 */
+  .module-tab .tab-text { display: none; }
+
+  /* 模块面板默认隐藏，激活时浮出覆盖在 main-area 上方 */
+  .module-panel {
+    display: none;
+    position: absolute; top: 0; left: 52px;
+    width: calc(100vw - 52px); height: 100%;
+    background: #fff; z-index: 35;
+    flex-direction: column; overflow-y: auto;
+    box-shadow: 2px 0 12px rgba(0,0,0,.08);
+  }
+  .module-panel--active { display: flex !important; }
+
+  #module-bookmarks { padding: 8px 10px; gap: 6px; }
+  #module-notes { padding: 0; }
+
+  /* 调整搜索框 */
+  .search-input { height: 36px; font-size: 14px; }
+
   .sidebar-toggle { display: none; }
-  .main-area { display: flex; min-height: 40vh; }
+
+  /* 右侧预览区：桌面端保留，移动端被面板覆盖 */
+  .main-area {
+    flex: 1; display: flex; min-height: 0;
+    background: var(--bg); overflow-y: auto;
+    align-items: flex-start; justify-content: flex-start;
+    padding: 0;
+  }
+  .main-area .preview-placeholder { padding-top: 60px; }
+  .main-area .preview-content { padding: 12px; }
+
   .sidebar-overlay { display: none !important; }
+
+  /* 底部导航 */
+  .bottom-nav { display: flex; }
+  .bn-item { padding: 6px 0; }
+}
+
+/* 更小屏幕微调 */
+@media (max-width: 374px) {
+  .sidebar { width: 46px; min-width: 46px; max-width: 46px; }
+  .module-tab { width: 36px; height: 36px; font-size: 16px; }
+  .module-panel { left: 46px; width: calc(100vw - 46px); }
 }
 
 .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 44; }

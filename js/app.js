@@ -166,23 +166,22 @@ function toggleSidebar() {
   const sidebar = $('#sidebar');
   const isMobile = window.innerWidth < 768;
   if (isMobile) {
-    sidebar.classList.toggle('sidebar--open');
-    const overlay = document.querySelector('.sidebar-overlay');
-    if (sidebar.classList.contains('sidebar--open')) {
-      if (!overlay) { const d = document.createElement('div'); d.className = 'sidebar-overlay sidebar-overlay--show'; d.addEventListener('click', () => { sidebar.classList.remove('sidebar--open'); d.remove(); }); document.body.appendChild(d); }
-    } else { if (overlay) overlay.remove(); }
+    // 移动端：窄侧栏模式，不需要折叠
+    return;
   } else {
     sidebar.classList.toggle('sidebar--collapsed');
   }
 }
 
 function showMobileSidebar() {
+  // 移动端窄侧栏模式下，点击底部菜单按钮直接切换模块
+  // 不再需要弹出 overlay
   const sidebar = $('#sidebar');
-  sidebar.classList.add('sidebar--open');
-  if (!document.querySelector('.sidebar-overlay')) {
-    const d = document.createElement('div'); d.className = 'sidebar-overlay sidebar-overlay--show';
-    d.addEventListener('click', () => { sidebar.classList.remove('sidebar--open'); d.remove(); });
-    document.body.appendChild(d);
+  if (window.innerWidth >= 768) return;
+  // 确保当前激活的面板可见
+  const activePanel = document.querySelector('.module-panel--active');
+  if (activePanel) {
+    activePanel.scrollTop = 0;
   }
 }
 
@@ -232,6 +231,18 @@ function bindEvents() {
   // 底部导航切换
   $('#bn-bookmarks')?.addEventListener('click', () => switchModule('bookmarks'));
   $('#bn-notes')?.addEventListener('click', () => switchModule('notes'));
+
+  // 移动端：点击 main-area 背景关闭面板浮层
+  $('#main-area').addEventListener('click', (e) => {
+    if (window.innerWidth >= 768) return;
+    // 只响应直接点击 main-area 本身（不是内部元素冒泡）
+    if (e.target !== $('#main-area')) return;
+    // 关闭面板：移除所有 module-panel--active
+    document.querySelectorAll('.module-panel--active').forEach(p => p.classList.remove('module-panel--active'));
+    document.querySelectorAll('.module-tab--active').forEach(t => t.classList.remove('module-tab--active'));
+    // 重置底部导航
+    document.querySelectorAll('.bn-item').forEach(b => b.classList.remove('bn-item--active'));
+  });
 
   // 打开收藏详情（预览区）
   document.addEventListener('open-bookmark', (e) => { haptic(); showPreview(e.detail); });
@@ -356,7 +367,8 @@ function bindEvents() {
 
   // 侧栏
   $('#sidebar-toggle').addEventListener('click', toggleSidebar);
-  $('#mobile-sidebar-btn').addEventListener('click', showMobileSidebar);
+  const mobileSidebarBtn = $('#mobile-sidebar-btn');
+  if (mobileSidebarBtn) mobileSidebarBtn.addEventListener('click', showMobileSidebar);
 
   window.addEventListener('resize', () => {
     if (window.innerWidth >= 768) { const s = $('#sidebar'); s.classList.remove('sidebar--open'); const o = document.querySelector('.sidebar-overlay'); if (o) o.remove(); }
