@@ -2,8 +2,9 @@
 // 纯前端，无后端。数据存于浏览器本地。
 
 const DB_NAME = 'media-workbench';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'bookmarks';
+const NOTES_STORE = 'notes';
 
 let dbPromise = null;
 
@@ -17,6 +18,11 @@ function openDB() {
         const store = db.createObjectStore(STORE, { keyPath: 'id' });
         store.createIndex('platform', 'platform', { unique: false });
         store.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(NOTES_STORE)) {
+        const ns = db.createObjectStore(NOTES_STORE, { keyPath: 'id' });
+        ns.createIndex('status', 'status', { unique: false });
+        ns.createIndex('createdAt', 'createdAt', { unique: false });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -94,4 +100,14 @@ export async function importJSON(text) {
     count++;
   }
   return count;
+}
+
+// ---- 共享 DB 访问（供 hub.js 使用）----
+
+export function getDB() {
+  return openDB();
+}
+
+export function notesTx(mode) {
+  return openDB().then((db) => db.transaction(NOTES_STORE, mode).objectStore(NOTES_STORE));
 }

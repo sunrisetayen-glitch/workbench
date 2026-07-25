@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "2ndbrain": {
+      "source": "our2ndbrain/2ndbrain-template",
+      "sourceType": "github",
+      "skillPath": "skills/2ndbrain/SKILL.md",
+      "computedHash": "e42e913f12801bf73c4affc0cfb3daf2643c4479da636844534963ed003cb65e"
+    },
+    "second-brain": {
+      "source": "coreyhaines31/makerskills",
+      "sourceType": "github",
+      "skillPath": "skills/second-brain/SKILL.md",
+      "computedHash": "6325908f913536925b8a38879d8ab82d03de11ff46e4e440d057af19ce9d3b55"
+    },
+    "url-dump": {
+      "source": "huytieu/cog-second-brain",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/url-dump/SKILL.md",
+      "computedHash": "ce8cc77d0ff3853cd5cffb2b243b5554ca8ded85dba6eb3cdf4c8c226a9a730c"
+    }
+  }
+}
