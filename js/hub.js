@@ -185,3 +185,27 @@ export async function getNoteStats() {
     compiled: all.filter((n) => n.status === 'compiled').length,
   };
 }
+
+// 批量导入预设灵感碎片（从 JSON 数组导入到 notes store）
+export async function importPresetNotes(notesArray) {
+  if (!Array.isArray(notesArray) || notesArray.length === 0) return 0;
+  const store = await notesTx('readwrite');
+  let count = 0;
+  for (const note of notesArray) {
+    const id = note.id || (crypto.randomUUID ? crypto.randomUUID() : 'n-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8));
+    const body = note.body || (note.title ? note.title + '\n\n' + note.content : note.content || '');
+    const record = {
+      id,
+      type: note.type || ((note.content || body).length < 50 ? 'idea' : 'note'),
+      body: body,
+      url: note.url || '',
+      tags: note.tags || [],
+      topic: note.topic || '',
+      status: note.status || 'inbox',
+      createdAt: note.createdAt || (Date.now() - Math.floor(Math.random() * 86400000)),
+    };
+    await reqToP(store.put(record));
+    count++;
+  }
+  return count;
+}

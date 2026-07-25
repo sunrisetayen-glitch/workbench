@@ -7,7 +7,7 @@ import { recommend } from './recommend.js';
 import { buildSearchLinks } from './search.js';
 import { bookmarkCard, platformChips, detailModal, formModal, closeModal, toast, escapeHtml, formatDate } from './ui.js';
 import {
-  captureNote, getInboxNotes, compileTopics, getTopics, queryNotes, analyzeNotes, getNoteStats,
+  captureNote, getInboxNotes, compileTopics, getTopics, queryNotes, analyzeNotes, getNoteStats, importPresetNotes,
 } from './hub.js';
 
 const state = {
@@ -365,11 +365,30 @@ function bindEvents() {
 
 function registerSW() { if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {}); }
 
+// 首次使用时自动加载预设灵感碎片
+async function autoImportPresetNotes() {
+  const stats = await getNoteStats().catch(() => ({ total: 0 }));
+  if (stats.total > 0) return; // 已有数据，跳过
+
+  try {
+    const resp = await fetch('./preset-notes.json');
+    if (!resp.ok) return;
+    const notes = await resp.json();
+    const count = await importPresetNotes(notes);
+    if (count > 0) {
+      await refreshInboxList();
+      await refreshSidebarStats();
+      toast(`已导入 ${count} 条灵感碎片`);
+    }
+  } catch (_) {}
+}
+
 async function init() {
   bindEvents();
   try { await load(); } catch (_) {}
   try { await refreshSidebarStats(); } catch (_) {}
   try { await refreshInboxList(); } catch (_) {}
+  try { await autoImportPresetNotes(); } catch (_) {}
   appReady();
   registerSW();
 }

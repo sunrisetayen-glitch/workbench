@@ -1,5 +1,5 @@
 // Service Worker：全站预缓存 + 离线秒开 + iOS 适配
-const CACHE = 'media-workbench-v2';
+const CACHE = 'media-workbench-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   './css/styles.css',
   './js/app.js',
   './js/db.js',
+  './js/hub.js',
   './js/platforms.js',
   './js/recommend.js',
   './js/search.js',
