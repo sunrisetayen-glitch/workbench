@@ -1,83 +1,53 @@
-// 应用入口：状态管理、事件绑定、筛选/搜索、渲染编排 + inspiration-hub 集成
+// 应用入口：左侧两模块（收藏夹 + 灵感碎片）+ 右侧预览区
 import { PLATFORMS, getPlatform, detectPlatform } from './platforms.js';
 import {
-  getAllBookmarks,
-  putBookmark,
-  deleteBookmark,
-  getBookmark,
-  exportJSON,
-  importJSON,
+  getAllBookmarks, putBookmark, deleteBookmark, getBookmark, exportJSON, importJSON,
 } from './db.js';
 import { recommend } from './recommend.js';
 import { buildSearchLinks } from './search.js';
+import { bookmarkCard, platformChips, detailModal, formModal, closeModal, toast, escapeHtml, formatDate } from './ui.js';
 import {
-  bookmarkCard,
-  platformChips,
-  detailModal,
-  formModal,
-  closeModal,
-  toast,
-  escapeHtml,
-  formatDate,
-} from './ui.js';
-import {
-  captureNote,
-  getInboxNotes,
-  compileTopics,
-  getTopics,
-  queryNotes,
-  analyzeNotes,
-  deleteNote,
-  getNoteStats,
+  captureNote, getInboxNotes, compileTopics, getTopics, queryNotes, analyzeNotes, getNoteStats,
 } from './hub.js';
 
 const state = {
   all: [],
   filterPlatform: '',
   query: '',
+  activeModule: 'bookmarks', // 'bookmarks' | 'notes'
 };
 
 const $ = (sel) => document.querySelector(sel);
 
-// iOS 触觉反馈
-function haptic(style = 'light') {
-  try { if (navigator.vibrate) navigator.vibrate(style === 'medium' ? 10 : 4); } catch (_) {}
-}
+function haptic(s = 'light') { try { if (navigator.vibrate) navigator.vibrate(s === 'medium' ? 10 : 4); } catch (_) {} }
 
 function appReady() {
   document.body.classList.add('app-ready');
   document.body.classList.add('has-bottom-nav');
 }
 
-async function load() {
-  state.all = await getAllBookmarks();
-  render();
-}
+async function load() { state.all = await getAllBookmarks(); render(); }
 
 function filtered() {
   const q = state.query.trim().toLowerCase();
   return state.all.filter((bm) => {
     if (state.filterPlatform && bm.platform !== state.filterPlatform) return false;
     if (!q) return true;
-    const hay = [bm.title, bm.url, (bm.tags || []).join(' '), bm.note].join(' ').toLowerCase();
-    return hay.includes(q);
+    return [bm.title, bm.url, (bm.tags || []).join(' '), bm.note].join(' ').toLowerCase().includes(q);
   });
 }
 
 function render() {
   const chipsHost = $('#chips');
   chipsHost.innerHTML = '';
-  chipsHost.appendChild(platformChips(PLATFORMS, state.filterPlatform, (key) => {
-    state.filterPlatform = key;
-    render();
-  }));
+  chipsHost.appendChild(platformChips(PLATFORMS, state.filterPlatform, (key) => { state.filterPlatform = key; render(); }));
   renderTagCloud();
   const grid = $('#grid');
   grid.innerHTML = '';
   const list = filtered();
   $('#count').textContent = `${list.length} / ${state.all.length}`;
   if (list.length === 0) {
-    grid.innerHTML = `<div class="empty">${state.all.length === 0 ? '还没有收藏，点右下角 ➕ 添加第一条灵感吧' : '没有匹配的内容，换个筛选试试'}</div>`;
+    grid.innerHTML = `<div class="empty">${state.all.length === 0 ? '还没有收藏，点右下角 ＋ 添加第一条灵感吧' : '没有匹配的内容，换个筛选试试'}</div>`;
     return;
   }
   const frag = document.createDocumentFragment();
@@ -88,38 +58,141 @@ function render() {
 function renderTagCloud() {
   const host = $('#tagcloud');
   const freq = new Map();
-  for (const bm of state.all) {
-    for (const t of bm.tags || []) { const k = t.toLowerCase(); freq.set(k, (freq.get(k) || 0) + 1); }
-  }
+  for (const bm of state.all) for (const t of bm.tags || []) { const k = t.toLowerCase(); freq.set(k, (freq.get(k) || 0) + 1); }
   const top = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 16);
   host.innerHTML = top.length ? top.map(([t]) => `<button class="cloud-tag" type="button" data-tag="${t}">#${t}</button>`).join('') : '<span class="muted">收藏后打标签，这里会出现标签云</span>';
 }
 
-async function openDetail(id) {
+// ===== 右侧预览：点击左侧收藏时在右侧展示详情 =====
+async function showPreview(id) {
   const bm = await getBookmark(id);
   if (!bm) return;
-  closeModal();
-  const similar = recommend(bm, state.all, 6);
+  const p = getPlatform(bm.platform);
+  const color = p ? p.color : '#888';
+  const emoji = p ? p.emoji : '🔖';
+  const pname = p ? p.name : '其他';
+  const tags = (bm.tags || []).filter(Boolean).map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join('') || '<span class="muted">无标签</span>';
+
+  const similar = recommend(bm, state.all, 5);
+  const similarHtml = similar.length
+    ? similar.map((s) => `
+      <button class="sim-item" data-id="${s.bookmark.id}" type="button">
+        <span class="sim-emoji">${getPlatform(s.bookmark.platform)?.emoji || '🔖'}</span>
+        <span class="sim-title">${escapeHtml(s.bookmark.title || s.bookmark.url)}</span>
+        <span class="sim-score">${Math.round(s.score * 100)}%</span>
+      </button>`).join('')
+    : '<p class="muted">库里还没有相似内容</p>';
+
   const links = buildSearchLinks(bm);
-  document.body.appendChild(detailModal(bm, similar, links));
+  const searchHtml = links.map((l) => `
+    <a class="search-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener" style="--brand:${l.color}">
+      <span class="sl-emoji">${l.emoji}</span><span class="sl-name">${escapeHtml(l.name)}</span><span class="sl-go">↗</span>
+    </a>`).join('');
+
+  const el = $('#preview-content');
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <span class="plat-badge" style="background:${color};width:24px;height:24px;font-size:14px">${emoji}</span>
+      <span style="color:var(--muted);font-size:14px">${escapeHtml(pname)}</span>
+    </div>
+    <h2 style="font-size:20px;margin:0 0 8px">${escapeHtml(bm.title || '未命名')}</h2>
+    <div class="card-tags" style="margin-bottom:10px">${tags}</div>
+    ${bm.note ? `<div class="modal-note">${escapeHtml(bm.note)}</div>` : ''}
+    <div class="modal-actions">
+      ${bm.url ? `<a class="btn btn--primary" href="${escapeHtml(bm.url)}" target="_blank" rel="noopener">打开原帖 ↗</a>` : ''}
+      <button class="btn btn--ghost" data-act="edit-preview" data-id="${escapeHtml(bm.id)}" type="button">编辑</button>
+      <button class="btn btn--danger" data-act="delete-preview" data-id="${escapeHtml(bm.id)}" type="button">删除</button>
+    </div>
+    <div class="modal-section"><h4>📚 库内相似内容</h4><div class="similar-list">${similarHtml}</div></div>
+    <div class="modal-section"><h4>🌐 各平台搜索类似内容</h4><div class="search-links">${searchHtml}</div></div>`;
+
+  el.classList.add('preview-content--show');
+  const ph = $('#preview-placeholder');
+  if (ph) ph.style.display = 'none';
 }
 
-function openForm(initial) {
-  closeModal();
-  document.body.appendChild(formModal(PLATFORMS, initial || {}));
+// ===== 模块切换 =====
+function switchModule(mod) {
+  state.activeModule = mod;
+  document.querySelectorAll('.module-tab').forEach((b) => b.classList.toggle('module-tab--active', b.dataset.module === mod));
+  document.querySelectorAll('.module-panel').forEach((p) => p.classList.toggle('module-panel--active', p.id === `module-${mod}`));
+  // 底部导航高亮
+  document.querySelectorAll('.bn-item').forEach((b) => {
+    b.classList.toggle('bn-item--active',
+      (b.id === 'bn-bookmarks' && mod === 'bookmarks') || (b.id === 'bn-notes' && mod === 'notes'));
+  });
+  if (mod === 'notes') refreshInboxList();
 }
 
+function switchHubTab(tab) {
+  document.querySelectorAll('.hub-tab').forEach((b) => b.classList.toggle('hub-tab--active', b.dataset.tab === tab));
+  document.querySelectorAll('.hub-panel').forEach((p) => p.classList.toggle('hub-panel--active', p.id === `panel-${tab}`));
+  if (tab === 'capture') refreshInboxList();
+  if (tab === 'compile') refreshTopicsList();
+}
+
+// ===== 灵感碎片辅助 =====
+async function refreshSidebarStats() {
+  try { const s = await getNoteStats(); $('#stat-total').textContent = s.total; $('#stat-inbox').textContent = s.inbox; } catch (_) {}
+}
+
+async function refreshInboxList() {
+  const el = $('#inbox-list');
+  try {
+    const notes = await getInboxNotes();
+    if (notes.length === 0) { el.innerHTML = '<p class="hub-hint">还没有碎片笔记</p>'; return; }
+    el.innerHTML = notes.map((n) => `
+      <div class="note-item">
+        <div>${escapeHtml(n.body)}</div>
+        <div class="note-tags">${(n.tags || []).map((t) => `<span class="note-tag">#${escapeHtml(t)}</span>`).join('')}</div>
+        <div class="note-meta">${formatDate(n.createdAt)} · ${n.type === 'ref' ? '含链接' : n.type === 'idea' ? '灵感' : '笔记'}</div>
+      </div>`).join('');
+  } catch (_) { el.innerHTML = '<p class="hub-hint">加载失败</p>'; }
+}
+
+async function refreshTopicsList() {
+  const el = $('#topics-list');
+  try {
+    const topics = await getTopics();
+    if (topics.length === 0) { el.innerHTML = '<p class="hub-hint">还没有整理过话题</p>'; return; }
+    el.innerHTML = topics.map((t) => `<div class="topic-item" data-topic="${escapeHtml(t.name)}"><div class="topic-name">📌 ${escapeHtml(t.name)}</div><div class="topic-count">${t.count} 条笔记</div></div>`).join('');
+    const sel = $('#analyze-topic-select');
+    sel.innerHTML = '<option value="">-- 选择话题 --</option>' + topics.map((t) => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)} (${t.count}条)</option>`).join('');
+  } catch (_) { el.innerHTML = '<p class="hub-hint">加载失败</p>'; }
+}
+
+// ===== 侧栏开关 =====
+function toggleSidebar() {
+  const sidebar = $('#sidebar');
+  const isMobile = window.innerWidth < 768;
+  if (isMobile) {
+    sidebar.classList.toggle('sidebar--open');
+    const overlay = document.querySelector('.sidebar-overlay');
+    if (sidebar.classList.contains('sidebar--open')) {
+      if (!overlay) { const d = document.createElement('div'); d.className = 'sidebar-overlay sidebar-overlay--show'; d.addEventListener('click', () => { sidebar.classList.remove('sidebar--open'); d.remove(); }); document.body.appendChild(d); }
+    } else { if (overlay) overlay.remove(); }
+  } else {
+    sidebar.classList.toggle('sidebar--collapsed');
+  }
+}
+
+function showMobileSidebar() {
+  const sidebar = $('#sidebar');
+  sidebar.classList.add('sidebar--open');
+  if (!document.querySelector('.sidebar-overlay')) {
+    const d = document.createElement('div'); d.className = 'sidebar-overlay sidebar-overlay--show';
+    d.addEventListener('click', () => { sidebar.classList.remove('sidebar--open'); d.remove(); });
+    document.body.appendChild(d);
+  }
+}
+
+// ===== 表单相关 =====
 function suggestTags(text) {
   if (!text || text.length < 2) return [];
   const seg = typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function' && (() => { try { return new Intl.Segmenter('zh', { granularity: 'word' }); } catch (_) { return null; } })();
-  const freq = new Map();
-  const t = text.toLowerCase();
-  if (seg) {
-    for (const { segment, isWordLike } of seg.segment(t)) { if (isWordLike && segment.length >= 2 && segment.length <= 8) freq.set(segment, (freq.get(segment) || 0) + 1); }
-  } else {
-    const en = t.match(/[a-z]{3,}/g) || []; for (const w of en) freq.set(w, (freq.get(w) || 0) + 1);
-    const cn = t.match(/[\u4e00-\u9fff]/g) || []; for (let i = 0; i < cn.length - 1; i++) { const bg = cn[i] + cn[i + 1]; freq.set(bg, (freq.get(bg) || 0) + 1); }
-  }
+  const freq = new Map(); const t = text.toLowerCase();
+  if (seg) { for (const { segment, isWordLike } of seg.segment(t)) { if (isWordLike && segment.length >= 2 && segment.length <= 8) freq.set(segment, (freq.get(segment) || 0) + 1); } }
+  else { const en = t.match(/[a-z]{3,}/g) || []; for (const w of en) freq.set(w, (freq.get(w) || 0) + 1); const cn = t.match(/[\u4e00-\u9fff]/g) || []; for (let i = 0; i < cn.length - 1; i++) { freq.set(cn[i] + cn[i + 1], (freq.get(cn[i] + cn[i + 1]) || 0) + 1); } }
   const stop = new Set(['一个','这个','那个','可以','什么','怎么','如何','为什么','但是','而且','所以','因为','已经','还是','或者','没有','他们','我们','自己','就是','这样','那样','一样','一下','真的','太','很','都','也','不','了','吗','呢','吧','啊','哦','嗯','在','的','是','有','和','我','你','他','她','它','这','那','看','说','来','去','到']);
   return [...freq.entries()].filter(([w]) => !stop.has(w)).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([w]) => w);
 }
@@ -136,12 +209,9 @@ async function openFormWithClipboard() {
     if (!raw) { document.body.appendChild(formModal(PLATFORMS, {})); return; }
     const urlMatch = raw.match(/https?:\/\/[^\s]+/);
     if (urlMatch) {
-      const url = urlMatch[0];
-      const platform = detectPlatform(url);
-      let rest = raw.replace(url, '').trim();
-      rest = cleanClipboardText(rest);
-      const tags = suggestTags(rest);
-      prefill = { url, platform, title: rest, tags };
+      const url = urlMatch[0]; const platform = detectPlatform(url);
+      let rest = raw.replace(url, '').trim(); rest = cleanClipboardText(rest);
+      const tags = suggestTags(rest); prefill = { url, platform, title: rest, tags };
       const pname = platform ? getPlatform(platform)?.name : '';
       const detail = [pname, rest ? '标题' : '', tags.length ? `${tags.length}个标签` : ''].filter(Boolean).join(' + ');
       toast(detail ? `已识别：${detail}` : `已识别链接：${pname || '未知平台'}`);
@@ -150,203 +220,107 @@ async function openFormWithClipboard() {
   document.body.appendChild(formModal(PLATFORMS, prefill));
 }
 
-// ===== Inspiration Hub 逻辑 =====
-
-async function refreshSidebarStats() {
-  try {
-    const stats = await getNoteStats();
-    $('#stat-total').textContent = stats.total;
-    $('#stat-inbox').textContent = stats.inbox;
-  } catch (_) {}
-}
-
-async function refreshInboxList() {
-  const el = $('#inbox-list');
-  try {
-    const notes = await getInboxNotes();
-    if (notes.length === 0) { el.innerHTML = '<p class="hub-hint">还没有碎片笔记，在输入框里写点什么吧</p>'; return; }
-    el.innerHTML = notes.map((n) => `
-      <div class="note-item">
-        <div>${escapeHtml(n.body)}</div>
-        <div class="note-tags">${(n.tags || []).map((t) => `<span class="note-tag">#${escapeHtml(t)}</span>`).join('')}</div>
-        <div class="note-meta">${formatDate(n.createdAt)} · ${n.type === 'ref' ? '含链接' : n.type === 'idea' ? '灵感' : '笔记'}</div>
-      </div>`).join('');
-  } catch (_) { el.innerHTML = '<p class="hub-hint">加载失败</p>'; }
-}
-
-async function refreshTopicsList() {
-  const el = $('#topics-list');
-  try {
-    const topics = await getTopics();
-    if (topics.length === 0) { el.innerHTML = '<p class="hub-hint">还没有整理过话题，先记录一些碎片再点"自动整理"</p>'; return; }
-    el.innerHTML = topics.map((t) => `
-      <div class="topic-item" data-topic="${escapeHtml(t.name)}">
-        <div class="topic-name">📌 ${escapeHtml(t.name)}</div>
-        <div class="topic-count">${t.count} 条笔记</div>
-      </div>`).join('');
-
-    // 刷新分析面板的话题下拉
-    const sel = $('#analyze-topic-select');
-    sel.innerHTML = '<option value="">-- 选择话题 --</option>' + topics.map((t) => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)} (${t.count}条)</option>`).join('');
-  } catch (_) { el.innerHTML = '<p class="hub-hint">加载失败</p>'; }
-}
-
-// hub tab 切换
-function switchHubTab(tab) {
-  document.querySelectorAll('.hub-tab').forEach((b) => b.classList.toggle('hub-tab--active', b.dataset.tab === tab));
-  document.querySelectorAll('.hub-panel').forEach((p) => p.classList.toggle('hub-panel--active', p.id === `panel-${tab}`));
-  if (tab === 'capture') refreshInboxList();
-  if (tab === 'compile') refreshTopicsList();
-}
-
-// 侧栏开关（桌面端折叠 / 移动端浮层）
-function toggleSidebar() {
-  const sidebar = $('#sidebar');
-  const isMobile = window.innerWidth < 768;
-  if (isMobile) {
-    sidebar.classList.toggle('sidebar--open');
-    const overlay = document.querySelector('.sidebar-overlay');
-    if (sidebar.classList.contains('sidebar--open')) {
-      if (!overlay) {
-        const div = document.createElement('div');
-        div.className = 'sidebar-overlay sidebar-overlay--show';
-        div.addEventListener('click', () => { sidebar.classList.remove('sidebar--open'); div.remove(); });
-        document.body.appendChild(div);
-      }
-    } else {
-      if (overlay) overlay.remove();
-    }
-  } else {
-    sidebar.classList.toggle('sidebar--collapsed');
-  }
-}
-
-// 移动端底栏切换到笔记面板
-function showMobileSidebar() {
-  const sidebar = $('#sidebar');
-  sidebar.classList.add('sidebar--open');
-  const overlay = document.querySelector('.sidebar-overlay') || (() => {
-    const div = document.createElement('div'); div.className = 'sidebar-overlay sidebar-overlay--show';
-    div.addEventListener('click', () => { sidebar.classList.remove('sidebar--open'); div.remove(); });
-    document.body.appendChild(div); return div;
-  })();
-}
-
 // ===== 事件绑定 =====
 function bindEvents() {
-  document.addEventListener('open-bookmark', (e) => { haptic(); openDetail(e.detail); });
+  // 模块切换
+  $('#module-tabs').addEventListener('click', (e) => {
+    const tab = e.target.closest('.module-tab');
+    if (!tab) return;
+    switchModule(tab.dataset.module);
+  });
 
+  // 底部导航切换
+  $('#bn-bookmarks')?.addEventListener('click', () => switchModule('bookmarks'));
+  $('#bn-notes')?.addEventListener('click', () => switchModule('notes'));
+
+  // 打开收藏详情（预览区）
+  document.addEventListener('open-bookmark', (e) => { haptic(); showPreview(e.detail); });
+
+  // 添加按钮
   $('#add-btn').addEventListener('click', () => { haptic('medium'); openFormWithClipboard(); });
-  const navAdd = $('#add-btn-nav');
-  if (navAdd) navAdd.addEventListener('click', () => { haptic('medium'); openFormWithClipboard(); });
+  $('#add-btn-nav')?.addEventListener('click', () => { haptic('medium'); openFormWithClipboard(); });
 
+  // 搜索
   let qTimer = null;
   $('#search').addEventListener('input', (e) => {
-    clearTimeout(qTimer);
-    const v = e.target.value;
+    clearTimeout(qTimer); const v = e.target.value;
     qTimer = setTimeout(() => { state.query = v; render(); }, 200);
   });
 
+  // 标签云
   $('#tagcloud').addEventListener('click', (e) => {
-    const btn = e.target.closest('.cloud-tag');
-    if (!btn) return;
-    haptic();
-    const tag = btn.dataset.tag;
-    $('#search').value = tag;
-    state.query = tag;
-    render();
+    const btn = e.target.closest('.cloud-tag'); if (!btn) return; haptic();
+    $('#search').value = btn.dataset.tag; state.query = btn.dataset.tag; render();
   });
 
+  // 收藏表单提交
   document.addEventListener('submit', async (e) => {
     if (e.target.id !== 'bm-form') return;
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const url = fd.get('url').trim();
-    let platform = fd.get('platform');
+    e.preventDefault(); const fd = new FormData(e.target);
+    const url = fd.get('url').trim(); let platform = fd.get('platform');
     if (!platform) platform = detectPlatform(url);
     const tags = fd.get('tags').split(',').map((s) => s.trim()).filter(Boolean);
     const record = { id: e.target.dataset.id || undefined, url, platform, title: fd.get('title').trim(), tags, note: fd.get('note').trim(), thumb: fd.get('thumb').trim() };
-    await putBookmark(record);
-    closeModal();
-    await load();
-    toast('已保存');
+    await putBookmark(record); closeModal(); await load(); toast('已保存');
   });
 
+  // 预览区编辑/删除 + 相似卡片点击
   document.addEventListener('click', async (e) => {
+    // 编辑
+    let btn = e.target.closest('[data-act="edit-preview"]');
+    if (btn) { const bm = await getBookmark(btn.dataset.id); closeModal(); document.body.appendChild(formModal(PLATFORMS, bm)); return; }
+    // 删除
+    btn = e.target.closest('[data-act="delete-preview"]');
+    if (btn) { if (confirm('确定删除？')) { await deleteBookmark(btn.dataset.id); showPreview(null); await load(); toast('已删除'); } return; }
+    // 相似卡片点击
+    const sim = e.target.closest('.sim-item');
+    if (sim) { showPreview(sim.dataset.id); return; }
+    // 弹窗内编辑/删除
     const act = e.target.closest('[data-act]')?.dataset.act;
-    if (act === 'edit') {
-      const id = e.target.closest('.modal').dataset.id;
-      const bm = await getBookmark(id);
-      openForm(bm);
-    } else if (act === 'delete') {
-      const modal = e.target.closest('.modal');
-      const id = modal.dataset.id;
-      if (confirm('确定删除这条收藏？')) {
-        await deleteBookmark(id);
-        closeModal();
-        await load();
-        toast('已删除');
-      }
-    }
+    if (act === 'edit') { const id = e.target.closest('.modal').dataset.id; const bm = await getBookmark(id); closeModal(); document.body.appendChild(formModal(PLATFORMS, bm)); }
+    if (act === 'delete') { const modal = e.target.closest('.modal'); const id = modal.dataset.id; if (confirm('确定删除？')) { await deleteBookmark(id); closeModal(); await load(); toast('已删除'); } }
   });
 
-  $('#export-btn').addEventListener('click', async () => {
-    const json = await exportJSON();
-    const blob = new Blob([json], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `workbench-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    toast('备份已下载');
+  // 导出/导入（如果按钮存在）
+  const exportBtn = $('#export-btn');
+  if (exportBtn) exportBtn.addEventListener('click', async () => {
+    const json = await exportJSON(); const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `workbench-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(a.href); toast('备份已下载');
   });
-
-  $('#import-btn').addEventListener('click', () => $('#import-file').click());
-  $('#import-file').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try { const text = await file.text(); const n = await importJSON(text); await load(); toast(`已导入 ${n} 条`); }
-    catch (err) { toast('导入失败：' + err.message); }
-    e.target.value = '';
-  });
+  const importBtn = $('#import-btn');
+  const importFile = $('#import-file');
+  if (importBtn && importFile) {
+    importBtn.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      try { const text = await file.text(); const n = await importJSON(text); await load(); toast(`已导入 ${n} 条`); }
+      catch (err) { toast('导入失败：' + err.message); } e.target.value = '';
+    });
+  }
 
   // === Hub 事件 ===
-
-  // 记录
   $('#capture-btn').addEventListener('click', async () => {
-    const input = $('#capture-input');
-    const text = input.value.trim();
-    if (!text) { toast('请输入内容'); return; }
-    const note = await captureNote(text);
-    input.value = '';
-    await refreshInboxList();
-    await refreshSidebarStats();
+    const text = $('#capture-input').value.trim(); if (!text) { toast('请输入内容'); return; }
+    const note = await captureNote(text); $('#capture-input').value = '';
+    await refreshInboxList(); await refreshSidebarStats();
     toast(`已记录：${(note.tags || []).slice(0, 3).join(', ')}`);
   });
 
-  // 整理
   $('#compile-btn').addEventListener('click', async () => {
-    const btn = $('#compile-btn');
-    btn.textContent = '整理中...';
-    btn.disabled = true;
+    const btn = $('#compile-btn'); btn.textContent = '整理中...'; btn.disabled = true;
     try {
       const result = await compileTopics();
-      await refreshInboxList();
-      await refreshTopicsList();
-      await refreshSidebarStats();
-      if (result.topics.length === 0) toast('暂无足够笔记可整理，多记录几条吧');
+      await refreshInboxList(); await refreshTopicsList(); await refreshSidebarStats();
+      if (result.topics.length === 0) toast('暂无足够笔记可整理');
       else toast(`已整理 ${result.topics.length} 个话题，${result.merged} 条笔记`);
     } catch (err) { toast('整理失败'); }
-    btn.textContent = '自动整理';
-    btn.disabled = false;
+    btn.textContent = '自动整理'; btn.disabled = false;
   });
 
-  // 提取
   $('#query-btn').addEventListener('click', async () => {
-    const kw = $('#query-input').value.trim();
-    if (!kw) { toast('请输入关键词'); return; }
-    const notes = await queryNotes(kw);
-    const el = $('#query-results');
+    const kw = $('#query-input').value.trim(); if (!kw) { toast('请输入关键词'); return; }
+    const notes = await queryNotes(kw); const el = $('#query-results');
     if (notes.length === 0) { el.innerHTML = '<p class="hub-hint">没有找到相关笔记</p>'; return; }
     el.innerHTML = notes.map((n) => `
       <div class="note-item" style="border-left-color:${n.status === 'compiled' ? '#4caf50' : 'var(--accent)'}">
@@ -357,81 +331,45 @@ function bindEvents() {
       </div>`).join('');
   });
 
-  // 分析
   $('#analyze-btn').addEventListener('click', async () => {
-    const topic = $('#analyze-topic-select').value;
-    if (!topic) { toast('请先选择话题'); return; }
-    const notes = await queryNotes(topic);
-    if (notes.length === 0) { toast('没有找到相关笔记'); return; }
-    const result = await analyzeNotes(notes);
-    const el = $('#analyze-results');
+    const topic = $('#analyze-topic-select').value; if (!topic) { toast('请先选择话题'); return; }
+    const notes = await queryNotes(topic); if (notes.length === 0) { toast('没有找到相关笔记'); return; }
+    const result = await analyzeNotes(notes); const el = $('#analyze-results');
     el.innerHTML = `
       <div class="analyze-suggestion">💡 ${escapeHtml(result.suggestion)}</div>
-      <p class="hub-hint" style="margin-top:6px">🔑 核心词：${escapeHtml(result.keywords)}</p>
-      <div class="analyze-links">
-        ${result.links.map((l) => `
-          <a class="analyze-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener" style="--brand:${l.color}">
-            <span>${l.emoji}</span>
-            <span style="flex:1">${escapeHtml(l.name)}</span>
-            <span>↗</span>
-          </a>`).join('')}
-      </div>`;
+      <p class="hub-hint" style="margin-top:4px">🔑 核心词：${escapeHtml(result.keywords)}</p>
+      <div class="analyze-links">${result.links.map((l) => `<a class="analyze-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener" style="--brand:${l.color}"><span>${l.emoji}</span><span style="flex:1">${escapeHtml(l.name)}</span><span>↗</span></a>`).join('')}</div>`;
   });
 
   // hub tab 切换
   $('#hub-tabs').addEventListener('click', (e) => {
-    const tab = e.target.closest('.hub-tab');
-    if (!tab) return;
-    switchHubTab(tab.dataset.tab);
+    const tab = e.target.closest('.hub-tab'); if (!tab) return; switchHubTab(tab.dataset.tab);
   });
 
-  // 话题点击 → 跳转到提取面板
+  // 话题点击 → 提取
   $('#topics-list').addEventListener('click', async (e) => {
-    const item = e.target.closest('.topic-item');
-    if (!item) return;
-    const topic = item.dataset.topic;
-    $('#query-input').value = topic;
-    switchHubTab('query');
-    const notes = await queryNotes(topic);
-    const el = $('#query-results');
-    el.innerHTML = notes.map((n) => `
-      <div class="note-item" style="border-left-color:#4caf50">
-        <div>${escapeHtml(n.body)}</div>
-        <div class="note-tags">${(n.tags || []).map((t) => `<span class="note-tag">#${escapeHtml(t)}</span>`).join('')}</div>
-        <div class="note-meta">${formatDate(n.createdAt)}</div>
-      </div>`).join('');
+    const item = e.target.closest('.topic-item'); if (!item) return;
+    const topic = item.dataset.topic; $('#query-input').value = topic; switchHubTab('query');
+    const notes = await queryNotes(topic); const el = $('#query-results');
+    el.innerHTML = notes.map((n) => `<div class="note-item" style="border-left-color:#4caf50"><div>${escapeHtml(n.body)}</div><div class="note-tags">${(n.tags || []).map((t) => `<span class="note-tag">#${escapeHtml(t)}</span>`).join('')}</div><div class="note-meta">${formatDate(n.createdAt)}</div></div>`).join('');
   });
 
-  // 侧栏切换
+  // 侧栏
   $('#sidebar-toggle').addEventListener('click', toggleSidebar);
   $('#mobile-sidebar-btn').addEventListener('click', showMobileSidebar);
 
-  // 移动端底栏
-  const bnNotes = $('#bn-notes');
-  if (bnNotes) bnNotes.addEventListener('click', showMobileSidebar);
-
-  // 窗口尺寸变化时处理响应式
   window.addEventListener('resize', () => {
-    const sidebar = $('#sidebar');
-    if (window.innerWidth >= 768) {
-      sidebar.classList.remove('sidebar--open');
-      const overlay = document.querySelector('.sidebar-overlay');
-      if (overlay) overlay.remove();
-    }
+    if (window.innerWidth >= 768) { const s = $('#sidebar'); s.classList.remove('sidebar--open'); const o = document.querySelector('.sidebar-overlay'); if (o) o.remove(); }
   });
 }
 
-function registerSW() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  }
-}
+function registerSW() { if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {}); }
 
 async function init() {
   bindEvents();
-  await load();
-  await refreshSidebarStats();
-  await refreshInboxList();
+  try { await load(); } catch (_) {}
+  try { await refreshSidebarStats(); } catch (_) {}
+  try { await refreshInboxList(); } catch (_) {}
   appReady();
   registerSW();
 }

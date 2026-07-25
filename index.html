@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="灵感台" />
-    <meta name="description" content="自媒体灵感工作台：碎片笔记整理 + 跨平台灵感参考" />
+    <meta name="description" content="自媒体灵感工作台" />
     <title>灵感工作台</title>
 
     <link rel="manifest" href="./manifest.webmanifest" />
@@ -16,116 +16,55 @@
     <link rel="icon" href="./assets/icons/icon-192.png" />
     <meta name="mobile-web-app-capable" content="yes" />
 
-    <!-- 内联关键 CSS：骨架屏 -->
     <style>
       :root{--accent:#ff5a5f;--bg:#f6f7fb}
       *{box-sizing:border-box;margin:0;padding:0}
       html,body{height:100%}
       body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif}
-      .skeleton{display:flex;flex-direction:column;height:100%}
-      .sk-top{background:rgba(255,255,255,.9);padding:14px;border-bottom:1px solid #ececf0;display:flex;align-items:center;gap:10px}
-      .sk-logo{height:22px;width:100px;background:#e8e9ed;border-radius:6px}
-      .sk-main{display:flex;flex:1}
-      .sk-side{width:280px;background:#fff;border-right:1px solid #ececf0;padding:12px;display:flex;flex-direction:column;gap:10px}
-      .sk-tab{height:36px;background:#e8e9ed;border-radius:8px;width:100%}
-      .sk-input{height:80px;background:#e8e9ed;border-radius:8px}
-      .sk-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px}
-      .sk-card{background:#e8e9ed;border-radius:16px;height:150px;animation:pulse 1.4s ease-in-out infinite}
-      .sk-card:nth-child(2){animation-delay:.15s}
-      .sk-card:nth-child(3){animation-delay:.3s}
-      .sk-card:nth-child(4){animation-delay:.45s}
+      .skeleton{display:flex;height:100%}
+      .sk-left{width:320px;background:#fff;border-right:1px solid #ececf0;padding:12px;display:flex;flex-direction:column;gap:10px}
+      .sk-row{height:30px;display:flex;gap:6px}
+      .sk-tab{flex:1;background:#e8e9ed;border-radius:8px}
+      .sk-block{flex:1;background:#e8e9ed;border-radius:10px;animation:pulse 1.4s ease-in-out infinite}
+      .sk-right{flex:1;padding:12px;display:flex;flex-direction:column;gap:10px}
+      .sk-card2{background:#e8e9ed;border-radius:16px;height:130px;animation:pulse 1.4s ease-in-out infinite}
+      .sk-card2:nth-child(2){animation-delay:.15s}
+      .sk-card2:nth-child(3){animation-delay:.3s}
       @keyframes pulse{0%,100%{opacity:.4}50%{opacity:.8}}
       .app-ready .skeleton{display:none}
-      @media (max-width:767px){.sk-side{display:none}}
+      @media (max-width:767px){.sk-left{display:none}.sk-right{display:block}}
     </style>
 
     <link rel="stylesheet" href="./css/styles.css" />
   </head>
   <body>
-    <!-- 骨架屏 -->
     <div class="skeleton">
-      <div class="sk-top"><div class="sk-logo"></div></div>
-      <div class="sk-main">
-        <div class="sk-side">
-          <div class="sk-tab"></div><div class="sk-tab"></div><div class="sk-tab"></div><div class="sk-tab"></div>
-          <div class="sk-input"></div>
-        </div>
-        <div class="sk-grid">
-          <div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div>
-        </div>
+      <div class="sk-left">
+        <div class="sk-row"><div class="sk-tab"></div><div class="sk-tab"></div></div>
+        <div class="sk-block"></div>
+      </div>
+      <div class="sk-right">
+        <div class="sk-card2"></div><div class="sk-card2"></div><div class="sk-card2"></div>
       </div>
     </div>
 
-    <!-- ====== 主布局 ====== -->
     <div class="app-layout" id="app-layout">
 
-      <!-- 左侧栏：灵感笔记 hub -->
+      <!-- ====== 左侧栏 ====== -->
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-          <h2 class="sidebar-logo">✍️ 灵感笔记</h2>
+          <h2 class="sidebar-logo">✨ 灵感工作台</h2>
           <button class="sidebar-toggle" id="sidebar-toggle" title="收起侧栏">◀</button>
         </div>
 
-        <!-- 四个 tab -->
-        <nav class="hub-tabs" id="hub-tabs">
-          <button class="hub-tab hub-tab--active" data-tab="capture">📝 记录</button>
-          <button class="hub-tab" data-tab="compile">🗂 整理</button>
-          <button class="hub-tab" data-tab="query">🔍 提取</button>
-          <button class="hub-tab" data-tab="analyze">🌐 分析</button>
+        <!-- 顶层两个模块 tab -->
+        <nav class="module-tabs" id="module-tabs">
+          <button class="module-tab module-tab--active" data-module="bookmarks">📌 收藏夹</button>
+          <button class="module-tab" data-module="notes">💡 灵感碎片</button>
         </nav>
 
-        <!-- 记录面板 -->
-        <div class="hub-panel hub-panel--active" id="panel-capture">
-          <textarea id="capture-input" class="hub-textarea" placeholder="记下碎片想法、粘贴链接……&#10;例如：短视频开头怎么抓人？试试前3秒反差法" rows="4"></textarea>
-          <button id="capture-btn" class="hub-btn hub-btn--primary">记录</button>
-          <div class="hub-inbox" id="inbox-list"></div>
-        </div>
-
-        <!-- 整理面板 -->
-        <div class="hub-panel" id="panel-compile">
-          <p class="hub-hint">将未归类的碎片笔记按话题自动合并</p>
-          <button id="compile-btn" class="hub-btn hub-btn--primary">自动整理</button>
-          <div class="hub-topics" id="topics-list"></div>
-        </div>
-
-        <!-- 提取面板 -->
-        <div class="hub-panel" id="panel-query">
-          <input id="query-input" class="hub-input" type="text" placeholder="输入话题关键词搜索……" />
-          <button id="query-btn" class="hub-btn hub-btn--primary">搜索笔记</button>
-          <div class="hub-results" id="query-results"></div>
-        </div>
-
-        <!-- 分析面板 -->
-        <div class="hub-panel" id="panel-analyze">
-          <p class="hub-hint">选择一个话题，查看各平台参考内容</p>
-          <select id="analyze-topic-select" class="hub-select">
-            <option value="">-- 选择话题 --</option>
-          </select>
-          <button id="analyze-btn" class="hub-btn hub-btn--primary">开始分析</button>
-          <div class="hub-results" id="analyze-results"></div>
-        </div>
-
-        <!-- 统计 -->
-        <div class="sidebar-stats" id="sidebar-stats">
-          <span>📊 笔记 <strong id="stat-total">0</strong></span>
-          <span>📥 待整理 <strong id="stat-inbox">0</strong></span>
-        </div>
-      </aside>
-
-      <!-- 右侧主内容区 -->
-      <main class="main-area" id="main-area">
-        <!-- 移动端侧栏切换按钮 -->
-        <button class="mobile-sidebar-btn" id="mobile-sidebar-btn">☰ 笔记</button>
-
-        <header class="topbar">
-          <div class="topbar-row">
-            <h1 class="logo">✨ 灵感收藏</h1>
-            <div class="topbar-tools">
-              <button id="export-btn" class="tool-btn" title="导出备份">⬇</button>
-              <button id="import-btn" class="tool-btn" title="导入备份">⬆</button>
-              <input id="import-file" type="file" accept="application/json" hidden />
-            </div>
-          </div>
+        <!-- ====== 模块 A：收藏夹 ====== -->
+        <div class="module-panel module-panel--active" id="module-bookmarks">
           <div class="search-wrap">
             <input id="search" class="search-input" type="search" placeholder="搜索标题 / 链接 / 标签 / 笔记" />
           </div>
@@ -134,33 +73,73 @@
             <span class="tagcloud-label">标签云</span>
             <div id="tagcloud" class="tagcloud"></div>
           </div>
-        </header>
-
-        <div class="content">
           <div class="grid-meta"><span id="count">0 / 0</span></div>
           <section id="grid" class="grid"></section>
         </div>
+
+        <!-- ====== 模块 B：灵感碎片 ====== -->
+        <div class="module-panel" id="module-notes">
+          <nav class="hub-tabs" id="hub-tabs">
+            <button class="hub-tab hub-tab--active" data-tab="capture">📝 记录</button>
+            <button class="hub-tab" data-tab="compile">🗂 整理</button>
+            <button class="hub-tab" data-tab="query">🔍 提取</button>
+            <button class="hub-tab" data-tab="analyze">🌐 分析</button>
+          </nav>
+
+          <div class="hub-panel hub-panel--active" id="panel-capture">
+            <textarea id="capture-input" class="hub-textarea" placeholder="记下碎片想法、粘贴链接……&#10;例如：短视频开头怎么抓人？试试前3秒反差法" rows="4"></textarea>
+            <button id="capture-btn" class="hub-btn hub-btn--primary">记录</button>
+            <div class="hub-inbox" id="inbox-list"></div>
+          </div>
+
+          <div class="hub-panel" id="panel-compile">
+            <p class="hub-hint">将未归类的碎片笔记按话题自动合并</p>
+            <button id="compile-btn" class="hub-btn hub-btn--primary">自动整理</button>
+            <div class="hub-topics" id="topics-list"></div>
+          </div>
+
+          <div class="hub-panel" id="panel-query">
+            <input id="query-input" class="hub-input" type="text" placeholder="输入话题关键词搜索……" />
+            <button id="query-btn" class="hub-btn hub-btn--primary">搜索笔记</button>
+            <div class="hub-results" id="query-results"></div>
+          </div>
+
+          <div class="hub-panel" id="panel-analyze">
+            <p class="hub-hint">选择一个话题，查看各平台参考内容</p>
+            <select id="analyze-topic-select" class="hub-select"><option value="">-- 选择话题 --</option></select>
+            <button id="analyze-btn" class="hub-btn hub-btn--primary">开始分析</button>
+            <div class="hub-results" id="analyze-results"></div>
+          </div>
+
+          <div class="sidebar-stats" id="sidebar-stats">
+            <span>📊 笔记 <strong id="stat-total">0</strong></span>
+            <span>📥 待整理 <strong id="stat-inbox">0</strong></span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ====== 右侧预览区 ====== -->
+      <main class="main-area" id="main-area">
+        <button class="mobile-sidebar-btn" id="mobile-sidebar-btn">☰ 菜单</button>
+        <div class="preview-placeholder" id="preview-placeholder">
+          <div class="preview-icon">👆</div>
+          <p class="preview-text">点击左侧收藏或灵感碎片查看详情</p>
+        </div>
+        <div class="preview-content" id="preview-content"></div>
       </main>
 
     </div>
 
-    <!-- 底部导航栏（移动端） -->
+    <!-- 底部导航 -->
     <nav class="bottom-nav">
-      <button class="bn-item bn-item--active" id="bn-home">
-        <span class="bn-icon">🏠</span>
-        <span class="bn-label">收藏</span>
+      <button class="bn-item bn-item--active" id="bn-bookmarks">
+        <span class="bn-icon">📌</span><span class="bn-label">收藏夹</span>
       </button>
       <button class="bn-item" id="bn-notes">
-        <span class="bn-icon">✍️</span>
-        <span class="bn-label">笔记</span>
+        <span class="bn-icon">💡</span><span class="bn-label">灵感碎片</span>
       </button>
       <button class="bn-item" id="add-btn-nav">
-        <span class="bn-icon bn-icon--add">＋</span>
-        <span class="bn-label">添加</span>
-      </button>
-      <button class="bn-item" id="bn-stats">
-        <span class="bn-icon">📊</span>
-        <span class="bn-label">统计</span>
+        <span class="bn-icon bn-icon--add">＋</span><span class="bn-label">添加</span>
       </button>
     </nav>
 
