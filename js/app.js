@@ -111,6 +111,55 @@ async function showPreview(id) {
   if (ph) ph.style.display = 'none';
 }
 
+// ===== 右侧预览：点击左侧灵感碎片笔记时在右侧展示 =====
+async function showNotePreview(id) {
+  // 从 IndexedDB 获取笔记
+  let note = null;
+  try {
+    const { getDB } = await import('./db.js');
+    const db = await getDB();
+    const store = db.transaction('notes', 'readonly').objectStore('notes');
+    note = await new Promise((resolve, reject) => {
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (_) { return; }
+  if (!note) return;
+
+  let bodyHtml = escapeHtml(note.body);
+  bodyHtml = bodyHtml.replace(/\n/g, '<br>');
+  bodyHtml = bodyHtml.replace(/【(.+?)】/g, '<strong style="color:var(--accent);font-weight:700">【$1】</strong>');
+
+  const tagsHtml = (note.tags || []).map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join('') || '<span class="muted" style="font-size:11px">无标签</span>';
+
+  const el = $('#preview-content');
+  el.innerHTML = `
+    <div class="note-preview-card">
+      <div class="note-preview-actions">
+        <button class="btn btn--ghost" data-act="edit-note" data-note-id="${escapeHtml(note.id)}" type="button" style="padding:6px 12px;font-size:12px">✏️ 编辑</button>
+        <button class="btn btn--danger" data-act="del-note" data-note-id="${escapeHtml(note.id)}" type="button" style="padding:6px 12px;font-size:12px">🗑 删除</button>
+      </div>
+      <div class="note-preview-body">${bodyHtml}</div>
+      <div class="note-preview-tags">${tagsHtml}</div>
+      <div class="note-preview-meta">
+        ${formatDate(note.createdAt)} · ${note.type === 'ref' ? '含链接' : note.type === 'idea' ? '灵感' : '笔记'}
+        ${note.topic ? ` · 📌 ${escapeHtml(note.topic)}` : ''}
+      </div>
+    </div>`;
+
+  el.classList.add('preview-content--show');
+  const ph = $('#preview-placeholder');
+  if (ph) ph.style.display = 'none';
+
+  // 移动端：点击笔记后收起面板浮层，让用户看到右侧内容
+  if (window.innerWidth < 768) {
+    document.querySelectorAll('.module-panel--active').forEach(p => p.classList.remove('module-panel--active'));
+    document.querySelectorAll('.module-tab--active').forEach(t => t.classList.remove('module-tab--active'));
+    document.querySelectorAll('.bn-item').forEach(b => b.classList.remove('bn-item--active'));
+  }
+}
+
 // ===== 模块切换 =====
 function switchModule(mod) {
   state.activeModule = mod;
@@ -152,7 +201,7 @@ function renderNoteItem(n, extraMeta = '') {
         <button class="note-act-btn note-act-edit" data-act="edit-note" data-note-id="${escapeHtml(n.id)}" title="编辑">✏️</button>
         <button class="note-act-btn note-act-del" data-act="del-note" data-note-id="${escapeHtml(n.id)}" title="删除">🗑</button>
       </div>
-      <div class="note-body">${bodyHtml}</div>
+      <div class="note-body" data-act="preview-note" data-note-id="${escapeHtml(n.id)}">${bodyHtml}</div>
       <div class="note-tags">${(n.tags || []).map((t) => `<span class="note-tag">#${escapeHtml(t)}</span>`).join('')}</div>
       <div class="note-meta">${formatDate(n.createdAt)} · ${n.type === 'ref' ? '含链接' : n.type === 'idea' ? '灵感' : '笔记'}${extraMeta}</div>
     </div>`;
@@ -456,6 +505,13 @@ function bindEvents() {
         await refreshSidebarStats();
         toast('已删除');
       } catch (_) { toast('删除失败'); }
+      return;
+    }
+    // 预览笔记（点击笔记正文）
+    const previewBtn = e.target.closest('[data-act="preview-note"]');
+    if (previewBtn) {
+      e.preventDefault();
+      showNotePreview(previewBtn.dataset.noteId);
       return;
     }
   });

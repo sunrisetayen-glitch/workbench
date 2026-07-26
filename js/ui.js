@@ -17,7 +17,7 @@ export function formatDate(ts) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-// 单张收藏卡片
+// 单张收藏卡片 —— 紧凑列表样式
 export function bookmarkCard(bm) {
   const p = getPlatform(bm.platform);
   const color = p ? p.color : '#888';
@@ -27,21 +27,18 @@ export function bookmarkCard(bm) {
     .filter(Boolean)
     .map((t) => `<span class="tag">#${escapeHtml(t)}</span>`)
     .join('');
-  const thumb = bm.thumb
-    ? `<img class="card-thumb" src="${escapeHtml(bm.thumb)}" alt="" loading="lazy" onerror="this.style.display='none'">`
-    : `<div class="card-thumb card-thumb--placeholder" style="background:${color}22">${emoji}</div>`;
 
-  const el = document.createElement('article');
-  el.className = 'card';
+  const el = document.createElement('div');
+  el.className = 'bm-row';
   el.style.setProperty('--brand', color);
   el.dataset.id = bm.id;
   el.innerHTML = `
-    ${thumb}
-    <div class="card-body">
-      <div class="card-platform"><span class="plat-badge" style="background:${color}">${emoji}</span>${escapeHtml(pname)}</div>
-      <h3 class="card-title">${escapeHtml(bm.title || bm.url || '未命名')}</h3>
-      <div class="card-tags">${tags}</div>
-    </div>`;
+    <span class="bm-row-emoji">${emoji}</span>
+    <div class="bm-row-body">
+      <span class="bm-row-title">${escapeHtml(bm.title || bm.url || '未命名')}</span>
+      <span class="bm-row-tags">${tags || `<span class="muted" style="font-size:10px">无标签</span>`}</span>
+    </div>
+    <span class="bm-row-platform">${escapeHtml(pname)}</span>`;
   el.addEventListener('click', () => {
     document.dispatchEvent(new CustomEvent('open-bookmark', { detail: bm.id }));
   });
