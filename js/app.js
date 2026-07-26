@@ -7,7 +7,7 @@ import { recommend } from './recommend.js';
 import { buildSearchLinks } from './search.js';
 import { bookmarkCard, platformChips, detailModal, formModal, closeModal, toast, escapeHtml, formatDate } from './ui.js';
 import {
-  captureNote, getInboxNotes, compileTopics, getTopics, queryNotes, analyzeNotes, getNoteStats, importPresetNotes,
+  captureNote, getInboxNotes, compileTopics, getTopics, queryNotes, analyzeNotes, getNoteStats, importPresetNotes, updateNote, deleteNote,
 } from './hub.js';
 
 const state = {
@@ -136,17 +136,34 @@ async function refreshSidebarStats() {
   try { const s = await getNoteStats(); $('#stat-total').textContent = s.total; $('#stat-inbox').textContent = s.inbox; } catch (_) {}
 }
 
+// 渲染单条笔记的 HTML（带排版 + 编辑/删除按钮）
+function renderNoteItem(n, extraMeta = '') {
+  // 将 body 按 【】标题拆分，优化排版
+  let bodyHtml = escapeHtml(n.body);
+  // 保留换行
+  bodyHtml = bodyHtml.replace(/\n/g, '<br>');
+  // 高亮【xxx】标题
+  bodyHtml = bodyHtml.replace(/【(.+?)】/g, '<strong class="note-heading">【$1】</strong>');
+
+  const borderColor = n.status === 'compiled' ? '#4caf50' : 'var(--accent)';
+  return `
+    <div class="note-item" style="border-left-color:${borderColor}" data-note-id="${escapeHtml(n.id)}">
+      <div class="note-actions">
+        <button class="note-act-btn note-act-edit" data-act="edit-note" data-note-id="${escapeHtml(n.id)}" title="编辑">✏️</button>
+        <button class="note-act-btn note-act-del" data-act="del-note" data-note-id="${escapeHtml(n.id)}" title="删除">🗑</button>
+      </div>
+      <div class="note-body">${bodyHtml}</div>
+      <div class="note-tags">${(n.tags || []).map((t) => `<span class="note-tag">#${escapeHtml(t)}</span>`).join('')}</div>
+      <div class="note-meta">${formatDate(n.createdAt)} · ${n.type === 'ref' ? '含链接' : n.type === 'idea' ? '灵感' : '笔记'}${extraMeta}</div>
+    </div>`;
+}
+
 async function refreshInboxList() {
   const el = $('#inbox-list');
   try {
     const notes = await getInboxNotes();
     if (notes.length === 0) { el.innerHTML = '<p class="hub-hint">还没有碎片笔记</p>'; return; }
-    el.innerHTML = notes.map((n) => `
-      <div class="note-item">
-        <div>${escapeHtml(n.body)}</div>
-        <div class="note-tags">${(n.tags || []).map((t) => `<span class="note-tag">#${escapeHtml(t)}</span>`).join('')}</div>
-        <div class="note-meta">${formatDate(n.createdAt)} · ${n.type === 'ref' ? '含链接' : n.type === 'idea' ? '灵感' : '笔记'}</div>
-      </div>`).join('');
+    el.innerHTML = notes.map((n) => renderNoteItem(n)).join('');
   } catch (_) { el.innerHTML = '<p class="hub-hint">加载失败</p>'; }
 }
 
@@ -159,6 +176,94 @@ async function refreshTopicsList() {
     const sel = $('#analyze-topic-select');
     sel.innerHTML = '<option value="">-- 选择话题 --</option>' + topics.map((t) => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)} (${t.count}条)</option>`).join('');
   } catch (_) { el.innerHTML = '<p class="hub-hint">加载失败</p>'; }
+}
+
+// ===== 笔记编辑弹窗 =====
+function openNoteEditor(note) {
+  const tags = [...(note.tags || [])];
+
+  const renderTagChips = () => tags.map((t, i) =>
+    `<span class="editor-tag">#${escapeHtml(t)}<button class="editor-tag-remove" data-tag-idx="${i}" title="移除">×</button></span>`
+  ).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'note-editor-overlay';
+  overlay.innerHTML = `
+    <div class="modal note-editor-modal">
+      <button class="modal-close" id="editor-close">✕</button>
+      <h3 style="margin:0 0 12px;font-size:16px">✏️ 编辑笔记</h3>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:#555;margin-bottom:10px">
+        内容
+        <textarea id="editor-body" class="editor-textarea" rows="8">${escapeHtml(note.body)}</textarea>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:#555;margin-bottom:8px">
+        标签
+        <div class="editor-tags-row">
+          <span class="editor-tags-chips" id="editor-tags-chips">${renderTagChips()}</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <input id="editor-tag-input" class="hub-input" style="flex:1" placeholder="输入新标签，回车添加" />
+          <button id="editor-tag-add" class="btn btn--ghost" style="padding:6px 12px;font-size:12px">添加</button>
+        </div>
+      </label>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="editor-save" class="btn btn--primary" style="flex:1">保存</button>
+        <button id="editor-cancel" class="btn btn--ghost" style="flex:1">取消</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  // 关闭
+  const close = () => overlay.remove();
+  overlay.querySelector('#editor-close').addEventListener('click', close);
+  overlay.querySelector('#editor-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  // 添加标签
+  overlay.querySelector('#editor-tag-add').addEventListener('click', () => {
+    const input = overlay.querySelector('#editor-tag-input');
+    const val = input.value.trim();
+    if (val && !tags.includes(val)) {
+      tags.push(val);
+      overlay.querySelector('#editor-tags-chips').innerHTML = renderTagChips();
+      rebindTagRemove(overlay);
+    }
+    input.value = '';
+  });
+  overlay.querySelector('#editor-tag-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      overlay.querySelector('#editor-tag-add').click();
+    }
+  });
+
+  // 移除标签
+  function rebindTagRemove(el) {
+    el.querySelectorAll('.editor-tag-remove').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.tagIdx);
+        tags.splice(idx, 1);
+        el.querySelector('#editor-tags-chips').innerHTML = renderTagChips();
+        rebindTagRemove(el);
+      });
+    });
+  }
+  rebindTagRemove(overlay);
+
+  // 保存
+  overlay.querySelector('#editor-save').addEventListener('click', async () => {
+    const body = overlay.querySelector('#editor-body').value.trim();
+    if (!body) { toast('内容不能为空'); return; }
+    try {
+      await updateNote(note.id, { body, tags });
+      close();
+      await refreshInboxList();
+      await refreshSidebarStats();
+      toast('笔记已更新');
+    } catch (err) { toast('保存失败'); }
+  });
 }
 
 // ===== 侧栏开关 =====
@@ -318,6 +423,43 @@ function bindEvents() {
     toast(`已记录：${(note.tags || []).slice(0, 3).join(', ')}`);
   });
 
+  // 笔记编辑/删除事件委托（inbox、query-results、topics-list 统一处理）
+  document.addEventListener('click', async (e) => {
+    // 编辑笔记
+    const editBtn = e.target.closest('[data-act="edit-note"]');
+    if (editBtn) {
+      e.preventDefault();
+      const id = editBtn.dataset.noteId;
+      // 从 IndexedDB 获取完整笔记数据
+      try {
+        const { getDB } = await import('./db.js');
+        const db = await getDB();
+        const store = db.transaction('notes', 'readonly').objectStore('notes');
+        const note = await new Promise((resolve, reject) => {
+          const req = store.get(id);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        if (note) openNoteEditor(note);
+      } catch (_) { toast('无法加载笔记'); }
+      return;
+    }
+    // 删除笔记
+    const delBtn = e.target.closest('[data-act="del-note"]');
+    if (delBtn) {
+      e.preventDefault();
+      const id = delBtn.dataset.noteId;
+      if (!confirm('确定删除这条笔记？')) return;
+      try {
+        await deleteNote(id);
+        await refreshInboxList();
+        await refreshSidebarStats();
+        toast('已删除');
+      } catch (_) { toast('删除失败'); }
+      return;
+    }
+  });
+
   $('#compile-btn').addEventListener('click', async () => {
     const btn = $('#compile-btn'); btn.textContent = '整理中...'; btn.disabled = true;
     try {
@@ -333,13 +475,10 @@ function bindEvents() {
     const kw = $('#query-input').value.trim(); if (!kw) { toast('请输入关键词'); return; }
     const notes = await queryNotes(kw); const el = $('#query-results');
     if (notes.length === 0) { el.innerHTML = '<p class="hub-hint">没有找到相关笔记</p>'; return; }
-    el.innerHTML = notes.map((n) => `
-      <div class="note-item" style="border-left-color:${n.status === 'compiled' ? '#4caf50' : 'var(--accent)'}">
-        <div>${escapeHtml(n.body)}</div>
-        ${n.topic ? `<div class="note-meta">📌 ${escapeHtml(n.topic)}</div>` : ''}
-        <div class="note-tags">${(n.tags || []).map((t) => `<span class="note-tag">#${escapeHtml(t)}</span>`).join('')}</div>
-        <div class="note-meta">${formatDate(n.createdAt)}</div>
-      </div>`).join('');
+    el.innerHTML = notes.map((n) => {
+      const topicMeta = n.topic ? ` · 📌 ${escapeHtml(n.topic)}` : '';
+      return renderNoteItem(n, topicMeta);
+    }).join('');
   });
 
   $('#analyze-btn').addEventListener('click', async () => {
@@ -362,7 +501,7 @@ function bindEvents() {
     const item = e.target.closest('.topic-item'); if (!item) return;
     const topic = item.dataset.topic; $('#query-input').value = topic; switchHubTab('query');
     const notes = await queryNotes(topic); const el = $('#query-results');
-    el.innerHTML = notes.map((n) => `<div class="note-item" style="border-left-color:#4caf50"><div>${escapeHtml(n.body)}</div><div class="note-tags">${(n.tags || []).map((t) => `<span class="note-tag">#${escapeHtml(t)}</span>`).join('')}</div><div class="note-meta">${formatDate(n.createdAt)}</div></div>`).join('');
+    el.innerHTML = notes.map((n) => renderNoteItem(n)).join('');
   });
 
   // 侧栏

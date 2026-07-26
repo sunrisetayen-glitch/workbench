@@ -176,6 +176,16 @@ export async function deleteNote(id) {
   await reqToP(store.delete(id));
 }
 
+export async function updateNote(id, { body, tags }) {
+  const store = await notesTx('readwrite');
+  const existing = await reqToP(store.get(id));
+  if (!existing) throw new Error('笔记不存在');
+  existing.body = (body || '').trim();
+  existing.tags = tags || extractTags(existing.body);
+  await reqToP(store.put(existing));
+  return existing;
+}
+
 export async function getNoteStats() {
   const store = await notesTx('readonly');
   const all = await reqToP(store.getAll());

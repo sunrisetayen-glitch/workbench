@@ -137,10 +137,40 @@ body {
 
 .hub-inbox, .hub-results, .hub-topics { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1; }
 
-.note-item { background: var(--bg); border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.4; border-left: 3px solid var(--accent); }
-.note-item .note-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+.note-item { background: var(--bg); border-radius: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.65; border-left: 3px solid var(--accent); position: relative; }
+.note-body { white-space: pre-wrap; word-break: break-word; margin-bottom: 4px; }
+.note-heading { color: var(--accent); font-weight: 700; }
+.note-item .note-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
 .note-item .note-tag { font-size: 10px; color: var(--accent); background: #fff0f1; border-radius: 5px; padding: 1px 5px; }
-.note-item .note-meta { font-size: 10px; color: var(--muted); margin-top: 3px; }
+.note-item .note-meta { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+/* 笔记操作按钮 */
+.note-actions { position: absolute; top: 4px; right: 4px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.note-item:hover .note-actions,
+.note-item:active .note-actions { opacity: 1; }
+@media (max-width: 767px) { .note-actions { opacity: 1; } }
+.note-act-btn { width: 26px; height: 26px; border: 1px solid var(--line); background: var(--card); border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.note-act-btn:active { background: #f0f1f5; }
+.note-act-del:active { background: #ffe9e9; color: #d33; }
+
+/* 编辑弹窗 */
+.note-editor-modal { max-width: 500px; }
+.editor-textarea {
+  width: 100%; border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; font-size: 14px; line-height: 1.6;
+  font-family: inherit; resize: vertical; min-height: 120px;
+  outline: none; background: var(--bg); color: var(--text);
+}
+.editor-textarea:focus { border-color: var(--accent); }
+.editor-tags-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.editor-tags-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.editor-tag {
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: 12px; color: var(--accent); background: #fff0f1;
+  border-radius: 6px; padding: 2px 6px;
+}
+.editor-tag-remove { border: none; background: none; color: var(--accent); font-size: 14px; cursor: pointer; padding: 0 2px; line-height: 1; opacity: 0.6; }
+.editor-tag-remove:hover { opacity: 1; }
 
 .topic-item { background: var(--bg); border-radius: 8px; padding: 8px 10px; cursor: pointer; border: 1px solid var(--line); }
 .topic-item:active { background: #f0f1f5; }
