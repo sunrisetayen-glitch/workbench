@@ -198,8 +198,8 @@ function renderNoteItem(n, extraMeta = '') {
   return `
     <div class="note-item" style="border-left-color:${borderColor}" data-note-id="${escapeHtml(n.id)}">
       <div class="note-actions">
-        <button class="note-act-btn note-act-edit" data-act="edit-note" data-note-id="${escapeHtml(n.id)}" title="编辑">✏️</button>
-        <button class="note-act-btn note-act-del" data-act="del-note" data-note-id="${escapeHtml(n.id)}" title="删除">🗑</button>
+        <button class="note-act-btn note-act-edit" data-act="edit-note" data-note-id="${escapeHtml(n.id)}" title="编辑">✏️<span class="act-label">编辑</span></button>
+        <button class="note-act-btn note-act-del" data-act="del-note" data-note-id="${escapeHtml(n.id)}" title="删除">🗑<span class="act-label">删除</span></button>
       </div>
       <div class="note-body" data-act="preview-note" data-note-id="${escapeHtml(n.id)}">${bodyHtml}</div>
       <div class="note-tags">${(n.tags || []).map((t) => `<span class="note-tag">#${escapeHtml(t)}</span>`).join('')}</div>

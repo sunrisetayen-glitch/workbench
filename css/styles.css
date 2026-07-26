@@ -165,13 +165,20 @@ body {
 .note-item .note-meta { font-size: 10px; color: var(--muted); margin-top: 4px; }
 
 /* 笔记操作按钮 */
-.note-actions { position: absolute; top: 4px; right: 4px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.note-actions { position: absolute; top: 4px; right: 4px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
 .note-item:hover .note-actions,
 .note-item:active .note-actions { opacity: 1; }
 @media (max-width: 767px) { .note-actions { opacity: 1; } }
-.note-act-btn { width: 26px; height: 26px; border: 1px solid var(--line); background: var(--card); border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.note-act-btn { padding: 4px 8px; border: 1px solid var(--line); background: var(--card); border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; color: var(--muted); white-space: nowrap; }
 .note-act-btn:active { background: #f0f1f5; }
 .note-act-del:active { background: #ffe9e9; color: #d33; }
+/* 移动端显示文字标签 */
+@media (max-width: 767px) {
+  .note-act-btn .act-label { display: inline; }
+}
+@media (min-width: 768px) {
+  .note-act-btn .act-label { display: none; }
+}
 
 /* 编辑弹窗 */
 .note-editor-modal { max-width: 500px; }
@@ -208,12 +215,15 @@ body {
 /* ---- 右侧预览区 ---- */
 .main-area {
   flex: 1; display: flex; flex-direction: column; overflow-y: auto; min-width: 0;
-  background: var(--bg); align-items: center; justify-content: center;
+  background: var(--bg); align-items: center; justify-content: flex-start;
+  padding: 20px;
 }
-.preview-placeholder { text-align: center; color: var(--muted); }
+.preview-placeholder { text-align: center; color: var(--muted); padding-top: 80px; }
 .preview-icon { font-size: 48px; margin-bottom: 8px; }
 .preview-text { font-size: 14px; }
-.preview-content { display: none; width: 100%; max-width: 640px; padding: 20px; }
+.preview-content {
+  display: none; width: 100%; max-width: 720px;
+}
 .preview-content--show { display: block; }
 
 /* 移动端按钮 */
